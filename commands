@@ -1,0 +1,13 @@
+Start mongo and server. Execute from server folder.
+mongod --port 27017 --dbpath=./data
+node server.js
+
+Authorization.
+curl -H "Content-Type: application/json" -X POST -d '{"username":"xyz","password":"xyz"}' http://localhost:3000/login
+
+Get users.
+curl -H "Content-Type: application/json" -X GET -H "x-access-token:" http://localhost:3000/api/v1/admin/users
+
+Get products.
+curl -H "Content-Type: application/json" -X GET -H "x-access-token:" http://localhost:3000/api/v1/products
+

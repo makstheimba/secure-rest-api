@@ -1,71 +1,77 @@
 var jwt = require('jwt-simple');
- 
+var MongoClient = require('mongodb').MongoClient;
+var sha = require('sha256');
+
 var auth = {
  
   login: function(req, res) {
  
     var username = req.body.username || '';
-    var password = req.body.password || '';
- 
+    var password = req.body.password || '';    
+
     if (username == '' || password == '') {
-      res.status(401);
-      res.json({
-        "status": 401,
-        "message": "Invalid credentials"
-      });
+      auth.authFail(res);
       return;
     }
  
     // Fire a query to your DB and check if the credentials are valid
-    var dbUserObj = auth.validate(username, password);
-   
-    if (!dbUserObj) { // If authentication fails, we send a 401 back
-      res.status(401);
-      res.json({
-        "status": 401,
-        "message": "Invalid credentials"
+    auth.validate(username, password, res);
+ 
+  },
+ 
+  validate: function(username, password, res) {
+    MongoClient.connect("mongodb://localhost:27017/exampleDb", function(err, db) {
+      if (err) {
+        res.status(404);
+        res.json({
+          "status": 404,
+          "message": "Can't connect to database"
+        });
+        return ;
+      }
+      var collection = db.collection('users');
+      collection.findOne({name: username, password: sha(password)}, function (err, dbUserObj){
+        if (err || !dbUserObj) {
+          auth.authFail(res);
+        } else {
+          res.json(genToken(dbUserObj.name));
+        }
       });
-      return;
-    }
- 
-    if (dbUserObj) {
- 
-      // If authentication is success, we will generate a token
-      // and dispatch it to the client
- 
-      res.json(genToken(dbUserObj));
-    }
- 
+    });
   },
  
-  validate: function(username, password) {
-    // spoofing the DB response for simplicity
-    var dbUserObj = { // spoofing a userobject from the DB. 
-      name: 'arvind',
-      role: 'admin',
-      username: 'arvind@myapp.com'
-    };
- 
-    return dbUserObj;
+  validateUser: function(username, callback) {
+    MongoClient.connect("mongodb://localhost:27017/exampleDb", function(err, db) {
+      if (err) {
+        callback(null);
+        return ;
+      }
+      var collection = db.collection('users');
+      collection.findOne({name: username}, function (err, dbUserObj){
+        if (err || !dbUserObj) {
+          callback(null)
+        } else {
+          callback(dbUserObj);
+        }
+      });
+    });
   },
- 
-  validateUser: function(username) {
-    // spoofing the DB response for simplicity
-    var dbUserObj = { // spoofing a userobject from the DB. 
-      name: 'arvind',
-      role: 'admin',
-      username: 'arvind@myapp.com'
-    };
- 
-    return dbUserObj;
-  },
+
+  authFail(res) {
+    res.status(401);
+    res.json({
+      "status": 401,
+      "message": "Invalid credentials"
+    });
+  }
 }
  
 // private method
 function genToken(user) {
   var expires = expiresIn(7); // 7 days
   var token = jwt.encode({
-    exp: expires
+    exp: expires,
+    user: user
   }, require('../config/secret')());
  
   return {
